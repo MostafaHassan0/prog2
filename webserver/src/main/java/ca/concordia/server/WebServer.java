@@ -15,9 +15,9 @@ public class WebServer {
 
     public void start() throws IOException {
         // Load accounts from a file before starting the server
-        loadAccounts("resources/accounts.txt");
+        loadAccounts("webserver/src/main/resources/accounts.txt");
 
-        ServerSocket serverSocket = new ServerSocket(5001);
+        ServerSocket serverSocket = new ServerSocket(5000);
         System.out.println("Server is listening on port 5001");
 
         while (true) {
@@ -68,6 +68,7 @@ public class WebServer {
     }
 
     private void handleGetRequest(OutputStream out) throws IOException {
+        System.out.println("Handling GET request");
         String response = "HTTP/1.1 200 OK\r\n\r\n" +
                 "<!DOCTYPE html>\n" +
                 "<html>\n" +
@@ -75,15 +76,23 @@ public class WebServer {
                 "<title>Concordia Transfers</title>\n" +
                 "</head>\n" +
                 "<body>\n" +
+                "\n" +
                 "<h1>Welcome to Concordia Transfers</h1>\n" +
                 "<p>Select the account and amount to transfer</p>\n" +
+                "\n" +
                 "<form action=\"/submit\" method=\"post\">\n" +
                 "        <label for=\"account\">Account:</label>\n" +
                 "        <input type=\"text\" id=\"account\" name=\"account\"><br><br>\n" +
+                "\n" +
                 "        <label for=\"value\">Value:</label>\n" +
                 "        <input type=\"text\" id=\"value\" name=\"value\"><br><br>\n" +
+                "\n" +
                 "        <label for=\"toAccount\">To Account:</label>\n" +
                 "        <input type=\"text\" id=\"toAccount\" name=\"toAccount\"><br><br>\n" +
+                "\n" +
+                "        <label for=\"toValue\">To Value:</label>\n" +
+                "        <input type=\"text\" id=\"toValue\" name=\"toValue\"><br><br>\n" +
+                "\n" +
                 "        <input type=\"submit\" value=\"Submit\">\n" +
                 "    </form>\n" +
                 "</body>\n" +
@@ -111,7 +120,7 @@ public class WebServer {
         System.out.println("Request Body: " + requestBody.toString());
 
         String[] params = requestBody.toString().split("&");
-        int account = -1, value = 0, toAccount = -1;
+        int account = -1, value = 0, toAccount = -1, toValue = 0;
 
         for (String param : params) {
             String[] parts = param.split("=");
@@ -129,22 +138,38 @@ public class WebServer {
                     case "toAccount":
                         toAccount = Integer.parseInt(val);
                         break;
+
+                    case "toValue":
+                        toValue = Integer.parseInt(val);
+                        break;
                 }
             }
         }
 
         String response;
-        if (processTransfer(account, value, toAccount)) {
-            response = "HTTP/1.1 200 OK\r\n\r\nTransfer successful!";
+        String responseContent = "<html><body><h1>Thank you for using Concordia Transfers</h1>" +
+                "<h2>Received Form Inputs:</h2>"+
+                "<p>Account: " + account + "</p>" +
+                "<p>Value: " + value + "</p>" +
+                "<p>To Account: " + toAccount + "</p>" +
+                "<p>To Value: " + toValue + "</p>" +
+                "</body></html>";
+        if (processTransfer(account, value, toAccount, toValue)) {
+            response = "HTTP/1.1 200 OK\r\n\r\nTransfer successful!" + " Content-Length: " + responseContent.length() + "\r\n" +
+                    "Content-Type: text/html\r\n\r\n" +
+                    responseContent;
         } else {
-            response = "HTTP/1.1 400 Bad Request\r\n\r\nTransfer failed!";
+
+            response = "HTTP/1.1 400 Bad Request\r\n\r\nTransfer failed!"+ " Content-Length: " + responseContent.length() + "\r\n" +
+                    "Content-Type: text/html\r\n\r\n" +
+                    responseContent;
         }
 
         out.write(response.getBytes());
         out.flush();
     }
 
-    private boolean processTransfer(int fromAccount, int value, int toAccount) {
+    private boolean processTransfer(int fromAccount, int value, int toAccount, int toValue) {
         try {
             transferSemaphore.acquire();
             Account src = accounts.get(fromAccount);
