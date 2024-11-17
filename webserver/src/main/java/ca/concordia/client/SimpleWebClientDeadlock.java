@@ -28,7 +28,10 @@ public class SimpleWebClientDeadlock implements Runnable {
             writer = new PrintWriter(new OutputStreamWriter(out));
 
             // Prepare the POST request with form data
-            String postData = "account=" + fromAccount + "&value=1&toAccount=" + toAccount + "&toValue=1";
+            int transactionAmount = (int) (Math.random() * 100 + 1); // Random amount between 1 and 100
+            String postData = "account=" + fromAccount + "&value=" + transactionAmount + "&toAccount=" + toAccount;
+
+            System.out.println("Sending request: From Account=" + fromAccount + ", To Account=" + toAccount + ", Value=" + transactionAmount);
 
             // Introduce a random delay to simulate network delay and spread requests
             int waitTime = (int) (Math.random() * 500 + 500); // random delay between 500ms and 1000ms
@@ -53,7 +56,7 @@ public class SimpleWebClientDeadlock implements Runnable {
                 System.out.println(line);
             }
         } catch (IOException | InterruptedException e) {
-            e.printStackTrace();
+            System.err.println("Error in client communication: " + e.getMessage());
         } finally {
             // Close the streams and socket, with null checks
             try {
@@ -61,20 +64,24 @@ public class SimpleWebClientDeadlock implements Runnable {
                 if (writer != null) writer.close();
                 if (socket != null) socket.close();
             } catch (IOException e) {
-                e.printStackTrace();
+                System.err.println("Error closing resources: " + e.getMessage());
             }
         }
     }
 
     public static void main(String[] args) {
-        for (int i = 0; i <= 50; i++) {
+        int clientCount = args.length > 0 ? Integer.parseInt(args[0]) : 50; // Default to 50 clients
+        int accountRange = 500; // Accounts range from 100 to 500
+        for (int i = 0; i < clientCount; i++) {
             System.out.println("Creating client pair " + i);
-            Thread thread1 = new Thread(new SimpleWebClientDeadlock(123, 345));
-            Thread thread2 = new Thread(new SimpleWebClientDeadlock(345, 123));
+            Thread thread1 = new Thread(new SimpleWebClientDeadlock((int) (Math.random() * accountRange + 100),
+                    (int) (Math.random() * accountRange + 100)));
+            Thread thread2 = new Thread(new SimpleWebClientDeadlock((int) (Math.random() * accountRange + 100),
+                    (int) (Math.random() * accountRange + 100)));
             thread1.start();
             thread2.start();
             try {
-                Thread.sleep(2); // delay between each client pair, the higher the delay the better
+                Thread.sleep(2); // delay between each client pair
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }

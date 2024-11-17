@@ -4,13 +4,19 @@ import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.URLDecoder;
+import java.util.*;
 import java.util.concurrent.Semaphore;
 
 public class WebServer {
     private static final int MAX_CONNECTIONS = 1000; // Limit to 1000 concurrent clients
     private final Semaphore connectionSemaphore = new Semaphore(MAX_CONNECTIONS);
+    private final Map<Integer, Account> accounts = new HashMap<>(); // Store accounts in memory
+    private final Semaphore transferSemaphore = new Semaphore(1); // Ensure transfer operations are thread-safe
 
     public void start() throws IOException {
+        // Load accounts from a file before starting the server
+        loadAccounts("resources/accounts.txt");
+
         ServerSocket serverSocket = new ServerSocket(5001);
         System.out.println("Server is listening on port 5001");
 
@@ -78,8 +84,6 @@ public class WebServer {
                 "        <input type=\"text\" id=\"value\" name=\"value\"><br><br>\n" +
                 "        <label for=\"toAccount\">To Account:</label>\n" +
                 "        <input type=\"text\" id=\"toAccount\" name=\"toAccount\"><br><br>\n" +
-                "        <label for=\"toValue\">To Value:</label>\n" +
-                "        <input type=\"text\" id=\"toValue\" name=\"toValue\"><br><br>\n" +
                 "        <input type=\"submit\" value=\"Submit\">\n" +
                 "    </form>\n" +
                 "</body>\n" +
@@ -100,16 +104,14 @@ public class WebServer {
             }
         }
 
-        // Read the request body based on content length
         for (int i = 0; i < contentLength; i++) {
             requestBody.append((char) in.read());
         }
 
         System.out.println("Request Body: " + requestBody.toString());
 
-        // Parse the request body as URL-encoded parameters
         String[] params = requestBody.toString().split("&");
-        String account = null, value = null, toAccount = null, toValue = null;
+        int account = -1, value = 0, toAccount = -1;
 
         for (String param : params) {
             String[] parts = param.split("=");
@@ -119,37 +121,67 @@ public class WebServer {
 
                 switch (key) {
                     case "account":
-                        account = val;
+                        account = Integer.parseInt(val);
                         break;
                     case "value":
-                        value = val;
+                        value = Integer.parseInt(val);
                         break;
                     case "toAccount":
-                        toAccount = val;
-                        break;
-                    case "toValue":
-                        toValue = val;
+                        toAccount = Integer.parseInt(val);
                         break;
                 }
             }
         }
 
-        String responseContent = "<html><body><h1>Thank you for using Concordia Transfers</h1>" +
-                "<h2>Received Form Inputs:</h2>" +
-                "<p>Account: " + account + "</p>" +
-                "<p>Value: " + value + "</p>" +
-                "<p>To Account: " + toAccount + "</p>" +
-                "<p>To Value: " + toValue + "</p>" +
-                "</body></html>";
-
-        String response = "HTTP/1.1 200 OK\r\n" +
-                "Content-Length: " + responseContent.length() + "\r\n" +
-                "Content-Type: text/html\r\n\r\n" +
-                responseContent;
+        String response;
+        if (processTransfer(account, value, toAccount)) {
+            response = "HTTP/1.1 200 OK\r\n\r\nTransfer successful!";
+        } else {
+            response = "HTTP/1.1 400 Bad Request\r\n\r\nTransfer failed!";
+        }
 
         out.write(response.getBytes());
         out.flush();
     }
+
+    private boolean processTransfer(int fromAccount, int value, int toAccount) {
+        try {
+            transferSemaphore.acquire();
+            Account src = accounts.get(fromAccount);
+            Account dest = accounts.get(toAccount);
+
+            if (src == null || dest == null || src.getBalance() < value) {
+                return false;
+            }
+
+            src.withdraw(value);
+            dest.deposit(value);
+            return true;
+
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        } finally {
+            transferSemaphore.release();
+        }
+    }
+
+    private void loadAccounts(String filename) throws IOException {
+        try (BufferedReader reader = new BufferedReader(new FileReader(filename))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String[] parts = line.split(",");
+                int id = Integer.parseInt(parts[0].trim());
+                int balance = Integer.parseInt(parts[1].trim());
+                accounts.put(id, new Account(balance, id));
+            }
+        }
+    }
+
+
+
+
+
 
     public static void main(String[] args) {
         WebServer server = new WebServer();
