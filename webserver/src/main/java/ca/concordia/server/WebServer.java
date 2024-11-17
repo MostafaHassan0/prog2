@@ -1,47 +1,67 @@
 package ca.concordia.server;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
+import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.URLDecoder;
+import java.util.concurrent.Semaphore;
 
-//create the WebServer class to receive connections on port 5000. Each connection is handled by a master thread that puts the descriptor in a bounded buffer. A pool of worker threads take jobs from this buffer if there are any to handle the connection.
 public class WebServer {
+    private static final int MAX_CONNECTIONS = 1000; // Limit to 1000 concurrent clients
+    private final Semaphore connectionSemaphore = new Semaphore(MAX_CONNECTIONS);
 
-    public void start() throws java.io.IOException{
-        //Create a server socket
-        ServerSocket serverSocket = new ServerSocket(5000);
-        while(true){
-            System.out.println("Waiting for a client to connect...");
-            //Accept a connection from a client
-            Socket clientSocket = serverSocket.accept();
-            System.out.println("New client...");
+    public void start() throws IOException {
+        ServerSocket serverSocket = new ServerSocket(5001);
+        System.out.println("Server is listening on port 5001");
+
+        while (true) {
+            try {
+                // Accept a connection from a client
+                Socket clientSocket = serverSocket.accept();
+                System.out.println("New client connected");
+
+                // Handle each client connection in a new thread
+                new Thread(() -> handleClient(clientSocket)).start();
+            } catch (IOException e) {
+                System.err.println("Error accepting client connection: " + e.getMessage());
+            }
+        }
+    }
+
+    private void handleClient(Socket clientSocket) {
+        try {
+            // Acquire the semaphore before processing the client request
+            connectionSemaphore.acquire();
+            System.out.println("Semaphore acquired. Processing client: " + clientSocket);
+
             BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
             OutputStream out = clientSocket.getOutputStream();
 
+            // Read the first line to determine the type of request (GET or POST)
             String request = in.readLine();
             if (request != null) {
                 if (request.startsWith("GET")) {
-                    // Handle GET request
                     handleGetRequest(out);
                 } else if (request.startsWith("POST")) {
-                    // Handle POST request
                     handlePostRequest(in, out);
                 }
             }
 
+            // Close resources after handling the request
             in.close();
             out.close();
             clientSocket.close();
+
+        } catch (IOException | InterruptedException e) {
+            System.err.println("Error handling client: " + e.getMessage());
+        } finally {
+            // Release the semaphore to allow other clients to connect
+            connectionSemaphore.release();
+            System.out.println("Semaphore released for client: " + clientSocket);
         }
     }
 
-    private static void handleGetRequest(OutputStream out) throws IOException {
-        // Respond with a basic HTML page
-        System.out.println("Handling GET request");
+    private void handleGetRequest(OutputStream out) throws IOException {
         String response = "HTTP/1.1 200 OK\r\n\r\n" +
                 "<!DOCTYPE html>\n" +
                 "<html>\n" +
@@ -49,23 +69,17 @@ public class WebServer {
                 "<title>Concordia Transfers</title>\n" +
                 "</head>\n" +
                 "<body>\n" +
-                "\n" +
                 "<h1>Welcome to Concordia Transfers</h1>\n" +
                 "<p>Select the account and amount to transfer</p>\n" +
-                "\n" +
                 "<form action=\"/submit\" method=\"post\">\n" +
                 "        <label for=\"account\">Account:</label>\n" +
                 "        <input type=\"text\" id=\"account\" name=\"account\"><br><br>\n" +
-                "\n" +
                 "        <label for=\"value\">Value:</label>\n" +
                 "        <input type=\"text\" id=\"value\" name=\"value\"><br><br>\n" +
-                "\n" +
                 "        <label for=\"toAccount\">To Account:</label>\n" +
                 "        <input type=\"text\" id=\"toAccount\" name=\"toAccount\"><br><br>\n" +
-                "\n" +
                 "        <label for=\"toValue\">To Value:</label>\n" +
                 "        <input type=\"text\" id=\"toValue\" name=\"toValue\"><br><br>\n" +
-                "\n" +
                 "        <input type=\"submit\" value=\"Submit\">\n" +
                 "    </form>\n" +
                 "</body>\n" +
@@ -74,8 +88,7 @@ public class WebServer {
         out.flush();
     }
 
-    private static void handlePostRequest(BufferedReader in, OutputStream out) throws IOException {
-        System.out.println("Handling post request");
+    private void handlePostRequest(BufferedReader in, OutputStream out) throws IOException {
         StringBuilder requestBody = new StringBuilder();
         int contentLength = 0;
         String line;
@@ -92,7 +105,8 @@ public class WebServer {
             requestBody.append((char) in.read());
         }
 
-        System.out.println(requestBody.toString());
+        System.out.println("Request Body: " + requestBody.toString());
+
         // Parse the request body as URL-encoded parameters
         String[] params = requestBody.toString().split("&");
         String account = null, value = null, toAccount = null, toValue = null;
@@ -120,16 +134,14 @@ public class WebServer {
             }
         }
 
-        // Create the response
         String responseContent = "<html><body><h1>Thank you for using Concordia Transfers</h1>" +
-                "<h2>Received Form Inputs:</h2>"+
+                "<h2>Received Form Inputs:</h2>" +
                 "<p>Account: " + account + "</p>" +
                 "<p>Value: " + value + "</p>" +
                 "<p>To Account: " + toAccount + "</p>" +
                 "<p>To Value: " + toValue + "</p>" +
                 "</body></html>";
 
-        // Respond with the received form inputs
         String response = "HTTP/1.1 200 OK\r\n" +
                 "Content-Length: " + responseContent.length() + "\r\n" +
                 "Content-Type: text/html\r\n\r\n" +
@@ -140,7 +152,6 @@ public class WebServer {
     }
 
     public static void main(String[] args) {
-        //Start the server, if an exception occurs, print the stack trace
         WebServer server = new WebServer();
         try {
             server.start();
@@ -149,4 +160,3 @@ public class WebServer {
         }
     }
 }
-
