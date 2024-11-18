@@ -70,14 +70,11 @@ public class SimpleWebClientDeadlock implements Runnable {
     }
 
     public static void main(String[] args) {
-        int clientCount = args.length > 0 ? Integer.parseInt(args[0]) : 50; // Default to 50 clients
-        int accountRange = 500; // Accounts range from 100 to 500
+        int clientCount = 50;
         for (int i = 0; i < clientCount; i++) {
             System.out.println("Creating client pair " + i);
-            Thread thread1 = new Thread(new SimpleWebClientDeadlock((int) (Math.random() * accountRange + 100),
-                    (int) (Math.random() * accountRange + 100)));
-            Thread thread2 = new Thread(new SimpleWebClientDeadlock((int) (Math.random() * accountRange + 100),
-                    (int) (Math.random() * accountRange + 100)));
+            Thread thread1 = new Thread(new SimpleWebClientDeadlock(123, 345));
+            Thread thread2 = new Thread(new SimpleWebClientDeadlock(345, 123));
             thread1.start();
             thread2.start();
             try {
