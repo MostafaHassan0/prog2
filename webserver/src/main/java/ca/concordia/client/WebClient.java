@@ -3,12 +3,12 @@ package ca.concordia.client;
 import java.io.*;
 import java.net.Socket;
 
-public class SimpleWebClientDeadlock implements Runnable {
+public class WebClient implements Runnable {
 
     private final int fromAccount;
     private final int toAccount;
 
-    public SimpleWebClientDeadlock(int fromAccount, int toAccount) {
+    public WebClient(int fromAccount, int toAccount) {
         this.fromAccount = fromAccount;
         this.toAccount = toAccount;
     }
@@ -70,11 +70,24 @@ public class SimpleWebClientDeadlock implements Runnable {
     }
 
     public static void main(String[] args) {
-        int clientCount = 50;
+        int clientCount = 100;
+        try {
+            if (args.length > 0) {
+                clientCount = Integer.parseInt(args[0]); // Accept client count from command-line arguments
+            } else {
+                System.out.print("Enter the number of threads to create: ");
+                BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+                clientCount = Integer.parseInt(reader.readLine());
+            }
+        } catch (Exception e) {
+            System.err.println("Invalid input. Using default value of threads(100) will be used.");
+        }
+
+        System.out.println("Starting " + clientCount + " client threads...");
         for (int i = 0; i < clientCount; i++) {
             System.out.println("Creating client pair " + i);
-            Thread thread1 = new Thread(new SimpleWebClientDeadlock(123, 345));
-            Thread thread2 = new Thread(new SimpleWebClientDeadlock(345, 123));
+            Thread thread1 = new Thread(new WebClient(123, 345));
+            Thread thread2 = new Thread(new WebClient(345, 123));
             thread1.start();
             thread2.start();
             try {

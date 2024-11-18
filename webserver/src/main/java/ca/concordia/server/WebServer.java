@@ -147,13 +147,8 @@ public class WebServer {
         }
 
         String response;
-        String responseContent = "<html><body><h1>Thank you for using Concordia Transfers</h1>" +
-                "<h2>Received Form Inputs:</h2>"+
-                "<p>Account: " + account + "</p>" +
-                "<p>Value: " + value + "</p>" +
-                "<p>To Account: " + toAccount + "</p>" +
-                "<p>To Value: " + toValue + "</p>" +
-                "</body></html>";
+        String responseContent = " Received Form Inputs: Account: " + account +
+                " Value: " + value + " To Account: " + toAccount + " To Value: " + toValue;
         if (processTransfer(account, value, toAccount, toValue)) {
             response = "HTTP/1.1 200 OK\r\n\r\nTransfer successful!" + " Content-Length: " + responseContent.length() + "\r\n" +
                     "Content-Type: text/html\r\n\r\n" +
@@ -175,7 +170,14 @@ public class WebServer {
             Account src = accounts.get(fromAccount);
             Account dest = accounts.get(toAccount);
 
-            if (src == null || dest == null || src.getBalance() < value) {
+            if (src == null) {
+                System.err.println("Transfer failed: account not existing " + fromAccount);
+                return false;
+            } else if (dest == null) {
+                System.err.println("Transfer failed: account not existing " + toAccount);
+                return false;
+            } else if (src.getBalance() < value) {
+                System.err.println("Transfer failed: Insufficient balance in account " + fromAccount);
                 return false;
             }
 
@@ -202,10 +204,6 @@ public class WebServer {
             }
         }
     }
-
-
-
-
 
 
     public static void main(String[] args) {
