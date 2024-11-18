@@ -17,7 +17,7 @@ public class WebServer {
         // Load accounts from a file before starting the server
         loadAccounts("webserver/src/main/resources/accounts.txt");
 
-        ServerSocket serverSocket = new ServerSocket(5000);
+        ServerSocket serverSocket = new ServerSocket(5001);
         System.out.println("Server is listening on port 5001");
 
         while (true) {

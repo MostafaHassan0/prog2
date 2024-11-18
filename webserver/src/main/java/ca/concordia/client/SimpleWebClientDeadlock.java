@@ -20,7 +20,7 @@ public class SimpleWebClientDeadlock implements Runnable {
 
         try {
             // Establish a connection to the server
-            socket = new Socket("localhost", 5000);
+            socket = new Socket("localhost", 5001);
             System.out.println("Connected to server");
 
             // Create an output stream to send the request
